@@ -1,0 +1,28 @@
+#+TITLE: Acoustic Beacons
+
+* Overview
+
+The Modem class in ~classes/modem.py~ provides an interface to Delphis subsea acoustic modems.
+
+Multiple nodes form an acoustic telemetry network. Each *node* is a Raspberry Pi with an attached acoustic modem.
+
+All nodes contain identical code. When a node starts up, it checks the address of the attached modem and runs using associated parameters from ~config.yaml~.
+
+A mode can also be specified from the command line for testing purposes, ignoring the mode in ~config.yaml~.
+
+** Modes
+Depending on the specified mode, the node will perform a different task:
+
+- Active mode (~./beacons.py active~) runs two threads: one maintains a list of distances from all passive nodes in the network by cyclically pinging all passive nodes, and one parses all incoming messages.
+
+- Timer mode (~./beacons.py timer P~ or ~./beacons.py timer P xxx~) periodically (with period ~P~) broadcasts (or unicasts to modem ~xxx~) the current time from the node's Raspberry Pi.
+
+- Report mode (~./beacons.py report~) parses all incoming messages.
+
+** Deploying
+
+If all Raspberry Pi's have an entry in ~$HOME/.ssh/config~, ~deploy.sh~ can be used to copy code and configuration using ~scp~.
+
+* TODO
+- Create a "passive" mode which periodically broadcasts position
+- Estimate location every time an active beacon recieves a position from a passive beacon
