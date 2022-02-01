@@ -19,6 +19,8 @@ Depending on the specified mode, the node will perform a different task:
 
 - Report mode (~./beacons.py report~) parses all incoming messages.
 
+- Set address (~./beacons.py set xxx~): sets the address of the attached modem to ~xxx~.
+
 ** Deploying
 
 If all Raspberry Pi's have an entry in ~$HOME/.ssh/config~, ~deploy.sh~ can be used to copy code and configuration using ~scp~.
