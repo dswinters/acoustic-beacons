@@ -1,0 +1,15 @@
+settings:
+  coords: local
+  sound_speed: 340
+  rate: 0.5
+  reply_timeout: 1.0
+
+modems:
+  101:
+    host: navbeacon01
+    mode: active
+  202:
+    host: navbeacon02
+    mode: passive
+    x: 0
+    y: 0
