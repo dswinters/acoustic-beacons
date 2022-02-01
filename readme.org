@@ -23,6 +23,6 @@ Depending on the specified mode, the node will perform a different task:
 
 If all Raspberry Pi's have an entry in ~$HOME/.ssh/config~, ~deploy.sh~ can be used to copy code and configuration using ~scp~.
 
-* TODO
+* TODO In-progress
 - Create a "passive" mode which periodically broadcasts position
 - Estimate location every time an active beacon recieves a position from a passive beacon
