@@ -1,8 +1,11 @@
 settings:
-  coords: local
-  sound_speed: 340
-  rate: 0.5
+  coords: latlon
+  sound_speed: 1500
+  repeat_rate: 0.2
+  range_rate: 1.0
+  broadcast_rate: 3.0
   reply_timeout: 1.0
+  randomize: 0.1
 
 modems:
   101:
@@ -11,5 +14,5 @@ modems:
   202:
     host: navbeacon02
     mode: passive
-    x: 0
-    y: 0
+    lat: 27.988109
+    lon: 86.924972

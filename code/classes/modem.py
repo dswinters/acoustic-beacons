@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-import threading
+from threading import Thread
 import itertools
 import sys
 import serial
 import time
 import yaml
+import numpy as np
 from datetime import datetime
+import base64
 
 # Parse config file
 config_file = "/home/pi/nav/config.yaml"
@@ -13,9 +15,12 @@ config = yaml.safe_load(open(config_file))
 
 # Get network settings
 settings = {
-    'sound_speed'   : float(config['settings']['sound_speed']),
-    'rate'          : float(config['settings']['rate']),
-    'reply_timeout' : float(config['settings']['reply_timeout']),
+    'sound_speed'    : float(config['settings']['sound_speed']),
+    'repeat_rate'    : float(config['settings']['repeat_rate']),
+    'range_rate'     : float(config['settings']['range_rate']),
+    'broadcast_rate' : float(config['settings']['broadcast_rate']),
+    'reply_timeout'  : float(config['settings']['reply_timeout']),
+    'randomize'      : float(config['settings']['randomize']),
 }
 
 class Modem:
@@ -26,7 +31,7 @@ class Modem:
     #======================================================
     def __init__(self, mode=None, args=None):
 
-        # Open serial connection
+        # Open serial connection to modem
         self.ser = serial.Serial(
             port='/dev/ttyUSB0',
             baudrate = 9600,
@@ -36,12 +41,24 @@ class Modem:
             timeout=0.1
         )
 
+        # # TODO Open serial connection to GPS
+        # self.ser_gps = serial.Serial(
+        #     port='/dev/ttyAMA0',
+        #     baudrate = 9600,
+        #     bytesize=serial.EIGHTBITS,
+        #     parity=serial.PARITY_NONE,
+        #     stopbits=serial.STOPBITS_ONE,
+        #     timeout=0.1
+        # )
+
         # Verify modem status
-        status = self.status()
-        self.address = status['address']
+        status_msg = self.status()
+        self.address = status_msg['src']
+        print("Connected to modem %d, voltage: %.2fV" % (self.address,status_msg['voltage']))
 
         # Fall back to mode in config file if mode not set
         self.mode = mode or config['modems'][self.address]['mode']
+        print("Starting in %s mode" % self.mode)
         self.args = args
 
         # Define active and passive modems
@@ -51,85 +68,136 @@ class Modem:
                                if config['modems'][m]['mode']=='passive']
 
         # Initialize dictionary for location of passive modems
-        self.locs = {m:{'x': config['modems'][m]['x'],
-                        'y': config['modems'][m]['y']}
+        self.locs = {m:{'lat': config['modems'][m]['lat'],
+                        'lon': config['modems'][m]['lon']}
                      for m in self.passive_modems}
+
+        # Get initial position from config file
+        self.lat = None
+        self.lon = None
+        if self.mode == "passive":
+            self.lat = config['modems'][self.address]['lat']
+            self.lon = config['modems'][self.address]['lon']
 
     #======================================================
     # Low-level modem commands
     #======================================================
-    def send_and_wait(self, cmd=None, n=1, prefix=None):
-        "Optionally send a command and wait for the nth response"
-        t0 = time.time()
-        c = 0
-        while c<n and time.time() - t0 < settings['reply_timeout']:
-            # Send command until at least 1 response is recieved,
-            # then keep listening until nth response.
-            if cmd and c==0:
-                self.ser.write(cmd.encode())
+    def send(self, cmd=None, wait=False, n=1, prefix=None):
+        "Send a command, optionally wait for the Nth response"
 
-            # If we get a response with the right prefix, increment the counter
-            response = self.ser.readline().decode().strip()
-            if response and (not prefix or response[1] in prefix):
-                c+=1
-            time.sleep(settings['rate'])
-        return response
+        # If a command is specified and wait==False, send the command and
+        # immediately return.
+        if cmd and not wait:
+            self.ser.write(cmd.encode())
+            return None
+
+        # If wait==True, then:
+        # - Send the command (if a command is given)
+        # - Wait for the nth response with the desired prefix(es)
+        #   - If no prefix(es) is specified, wait for nth response with any prefix.
+        elif wait:
+            t0 = time.time()
+            c = 0
+            while c<n and time.time() - t0 < settings['reply_timeout']:
+                # Send command until at least 1 response is recieved,
+                # then keep listening until nth response.
+                if cmd and c==0:
+                    self.ser.write(cmd.encode())
+
+                # If we get a response with the right prefix, increment the counter
+                response = self.ser.readline().decode().strip()
+                if response and ((not prefix) or (response[1] in prefix)):
+                    c+=1
+                time.sleep(settings['repeat_rate'])
+            return parse_message(response)
 
     def status(self):
         "Query node address and voltage"
         cmd = "$?"
-        response = self.send_and_wait(cmd=cmd,prefix="A")
-        return self.parse_msg(response, stdout=True)
+        return self.send(cmd=cmd, wait=True, prefix="A")
 
     def set_address(self, address):
         "Set node address"
         cmd = "$A%03d" % (address)
-        response = self.send_and_wait(cmd)
-        return self.parse_msg(response, stdout=True)
+        return self.send(cmd, wait=True)
 
-    def broadcast(self, message):
+    def broadcast(self, message, wait=False):
         "Send message to all units in range"
         cmd = "$B%02d%s" % (len(message), message)
-        response = self.send_and_wait(cmd=cmd)
-        print("Broadcast: {}".format(message))
+        return self.send(cmd=cmd, wait=wait)
 
-    def unicast(self, message, target):
+    def unicast(self, message, target, wait=False):
         "Send message to target unit (specified by 3-digit integer)"
         cmd = "$U%03d%02d%s" % (target, len(message), message)
-        response = self.send_and_wait(cmd=cmd)
-        print("Unicast to {}: {}".format(target, message))
+        return self.send(cmd=cmd, wait=wait)
 
     def ping(self, target, wait=False):
-        "Send ping to target unit"
+        "Send range ping to target unit"
         cmd = "$P%03d" % (target)
-        if wait:
-            response = self.send_and_wait(cmd=cmd,prefix=["P","R"],n=2)
-            print(response)
-            # return self.parse_msg(response, stdout=True);
-        else:
-            self.ser.write(cmd.encode())
-            return []
+        return self.send(cmd=cmd,prefix=["P","R"],n=2,wait=wait)
 
     #======================================================
     # Processing threads
     #======================================================
+    # We should be fine to run any number of threads as long as:
+    # - No two threads try to write to the same serial port at the same time
+    # - No two threads try to read from the same serial port at the same time
+    #
+    # I've tried to set this up so any given thread only reads or only writes,
+    # and only to one serial port.
 
-    def ping_passive_beacons(self):
-        "Loop over passive beacons and record distances"
-        t0 = time.time() - settings['rate']
+    def active_ping(self):
+        "Cyclically loop over passive beacons and send ranging pings"
+        # Writes to acoustic modem serial port
+        t0 = time.time() - settings['range_rate']
         for target in itertools.cycle(self.passive_modems):
-            while time.time() - t0 <= settings['rate']:
+            while time.time() - t0 <= settings['range_rate']:
                 time.sleep(0.005)
-            msg = self.ping(target,wait=False)
-            t0 = time.time()
+            self.ping(target,wait=False)
+            t0 = time.time() + rand()
 
-    def report_all(self):
-        "Parse all incoming messages"
+    def active_listen(self):
+        "Parse ranging returns and broadcasts, update positions & distances"
         while self.ser.is_open:
-            line = self.ser.readline().decode().strip()
-            msg = self.parse_msg(line, stdout=True)
+            msg_str = self.ser.readline().decode().strip()
+            msg = parse_message(msg_str)
 
-    def timer(self):
+            # Position message from passive beacon:
+            if msg and msg['type'] == 'broadcast':
+                if is_hex(msg['str']):
+                    lat,lon = decode_ll(msg['str'])
+                    print("%d is at %.5f,%.5f" % (msg['src'],lat,lon))
+
+            # Range return from passive beacon:
+            elif msg and msg['type'] == 'range':
+                print("%.2f m from %d" % (msg['range'], msg['src']))
+
+    def passive_gps(self):
+        "Parse all incoming GPS messages and update position"
+        # Reads from GPS serial port
+        while self.ser_gps.is_open:
+            msg_str = self.ser_gps.readline().decode().strip()
+            # TODO: parse GPS messages and assign lat and lon
+            # self.lat = ...
+            # self.lon = ...
+
+    def passive_broadcast(self):
+        "Periodically broadcast current position"
+        while self.ser.is_open:
+            msg = encode_decimal_deg(self.lat) + encode_decimal_deg(self.lon)
+            self.broadcast(msg)
+            time.sleep(settings['broadcast_rate'] + rand())
+
+    def debug_report(self):
+        "Parse all incoming modem messages"
+        # Reads from acoustic modem serial port
+        while self.ser.is_open:
+            msg_str = self.ser.readline().decode().strip()
+            msg = parse_message(msg_str)
+            if msg:
+                print(msg)
+
+    def debug_timer(self):
         "Periodically broadcast the current time"
         period = float(self.args[0]) - settings['rate']
         target = len(self.args)>1 and int(self.args[1]) or None
@@ -145,81 +213,122 @@ class Modem:
     # Main loop
     #======================================================
     def run(self, mode):
-        lock = threading.Lock()
-        report_thread = threading.Thread(target = self.report_all)
-        ping_thread = threading.Thread(target = self.ping_passive_beacons)
-        timer_thread = threading.Thread(target = self.timer)
 
-        # Set node address
+        # Set address and exit if in "set" mode
         if mode == "set":
             address = int(self.args[0])
             self.set_address(address)
 
-        # Active mode:
-        # - Loop through passive beacons in sequence
-        # - Parse all incoming messages
-        elif mode == "active":
-            ping_thread.start()
-            report_thread.start()
+        # Define threads, but don't start any
+        ping_thread = Thread(target = self.active_ping)
+        listen_thread = Thread(target = self.active_listen)
+        gps_thread = Thread(target = self.passive_gps)
+        broadcast_thread = Thread(target = self.passive_broadcast)
 
-        # Timer mode:
-        # - Broadcast current time at specified rate, unicast if target specified
+        # Threads for debugging
+        report_thread = Thread(target = self.debug_report)
+        timer_thread = Thread(target = self.debug_timer)
+
+        if mode == "active":
+            ping_thread.start()
+            listen_thread.start()
+
+        elif mode == "passive":
+            broadcast_thread.start()
+
         elif mode == "timer":
             timer_thread.start()
+            report_thread.start()
 
-        # Report mode:
-        # - Parse all incoming messages
         elif mode == "report":
             report_thread.start()
 
+#=========================================================================
+# Helper functions
+#=========================================================================
 
-    def parse_msg(self, msg_str, stdout=False):
-        if msg_str:
+def parse_message(msg_str):
+    "Parse a raw message string and return a useful structure"
+    if not msg_str:
+        return None
 
-            # Get message prefix
-            msg = {'type': msg_str[1]}
+    # Get message prefix and initialize output
+    prefix = msg_str[1];
+    msg = {}
 
-            # Status: #AxxxVyyyyy (in response to $?)
-            #      or #Axxx       (in response to $Axxx)
-            if msg['type'] == "A":
-                msg['address'] = int(msg_str[2:5]) # xxx
-                if len(msg_str) > 5:
-                    msg['voltage'] = float(msg_str[6:])*15/65536  # yyyyy...
-                    if stdout:
-                        print("Modem ID: %s; voltage: %.2fmV" % \
-                              (msg['address'],msg['voltage']))
-                else:
-                    if stdout:
-                        print("Modem ID: set to %03d" % msg['address'])
-
-            # Broadcast: #Bxxxnnddd...
-            elif msg['type'] == "B":
-                msg['src'] = int(msg_str[2:5]) # xxx
-                msg['len'] = int(msg_str[5:7]) # nn
-                msg['str'] = msg_str[7:]  # ddd...
-                if stdout:
-                    print("Broadcast from {}: {}".format(msg['src'], msg['str']))
-
-            # Unicast: #Unnddd...
-            elif msg['type'] == "U":
-                msg['src'] = []
-                msg['len'] = int(msg_str[2:4]) # nn
-                msg['str'] = msg_str[4:]  # ddd...
-                if stdout:
-                    print("Unicast received: {}".format(msg['str']))
-
-            # Range: RxxxTyyyyy
-            elif msg['type'] == "R":
-                msg['src'] = int(msg_str[2:5])
-                msg['range'] = settings['sound_speed'] * 3.125e-5 * float(msg_str[6:11]);
-                if stdout:
-                    print("%03d %.4fm" % (msg['src'], msg['range']))
-                return msg
-
-            else:
-                msg['str'] = msg_str
-
-            return msg
-
+    # Status: #AxxxVyyyyy in response to "$?" (query status)
+    #      or #Axxx       in response to "$Axxx" (set address)
+    if prefix == "A":
+        msg['type'] = "status"
+        msg['src'] = int(msg_str[2:5]) # xxx
+        if len(msg_str) > 5:
+            msg['voltage'] = float(msg_str[6:])*15/65536  # yyyyy...
         else:
-            return []
+            msg['voltage'] = None
+
+    # Broadcast: #Bxxxnnddd... (broadcast recieved)
+    #            #Bnn          (self broadcast acknowledge)
+    elif prefix == "B":
+        if len(msg_str) > 4:
+            msg['type'] = "broadcast"
+            msg['src'] = int(msg_str[2:5]) # xxx
+            msg['str'] = msg_str[7:]  # ddd...
+        else:
+            msg['type'] = "broadcast_ack"
+            msg['len'] = int(msg_str[2:])
+
+    # Unicast: #Unnddd...
+    elif prefix == "U":
+        msg['type'] = "unicast"
+        msg['src'] = None
+        msg['str'] = msg_str[4:]  # ddd...
+
+    # Range: RxxxTyyyyy
+    elif prefix == "R":
+        msg['type'] = "range"
+        msg['src'] = int(msg_str[2:5])
+        msg['range'] = settings['sound_speed'] * 3.125e-5 * float(msg_str[6:11]);
+
+    # Note: Other message types are possible, but we don't currently use any of
+    #       them. Return None if we encounter these.
+    else:
+        return None
+
+    # Return message structure
+    return msg
+
+def encode_decimal_deg(deg):
+    "Encode decimal lat or lon to hexidecimal degrees, minutes, seconds"
+    # Output string looks like:  [DD] [MM] [SSS]  [N]
+    #                              |    |    |     |
+    #                           Degrees | Seconds  |
+    #                                 Minutes    1 if negative
+    neg = deg < 0
+    mins = (deg-np.floor(deg))*60
+    secs = (mins-np.floor(mins))*int('fff',16)
+    return "%02x%02x%03x%1x" % (int(np.floor(deg)), int(np.floor(mins)), int(np.floor(secs)), neg)
+
+def decode_hex_dms(dms):
+    "Decode hexidecimal degrees,mins,secs to decimal degrees"
+    degs = int(dms[0:2],16)
+    mins = int(dms[2:4],16)
+    secs = int(dms[4:7],16)*60/int('fff',16)
+    neg = bool(int(dms[7]))
+    dec = degs + mins/60 + secs/60**2
+    return neg and -1*dec or dec
+
+def encode_ll(lat,lon):
+    return encode_decimal_deg(lat) + encode_decimal_deg(lon)
+
+def decode_ll(hex_str):
+    return decode_hex_dms(hex_str[0:8]), decode_hex_dms(hex_str[8:])
+
+def is_hex(s):
+    try:
+        int(s, 16)
+        return True
+    except ValueError:
+        return False
+
+def rand():
+    return settings['randomize'] * np.random.random()
