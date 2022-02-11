@@ -166,11 +166,11 @@ class Modem:
             if msg and msg['type'] == 'broadcast':
                 if is_hex(msg['str']):
                     lat,lon = decode_ll(msg['str'])
-                    print("%d is at %.5f,%.5f" % (msg['src'],lat,lon))
+                    print("%d is at %.5f,%.5f" % (msg['src'],lat,lon),flush=True)
 
             # Range return from passive beacon:
             elif msg and msg['type'] == 'range':
-                print("%.2f m from %d" % (msg['range'], msg['src']))
+                print("%.2f m from %d" % (msg['range'], msg['src']),flush=True)
 
     def passive_gps(self):
         "Parse all incoming GPS messages and update position"
