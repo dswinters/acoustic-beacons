@@ -19,4 +19,16 @@ for i in 0{1..2}; do
   remote=pi@$name:/$remote_dir/config.yaml
   scp $local $remote && echo "  - copied $local to $remote"
 
+  local=beacons.service
+  remote=pi@$name:/$remote_dir/beacons.service
+  scp $local $remote && echo "  - copied $local to $remote"
+
+  local=beacons.conf
+  remote=pi@$name:/$remote_dir/beacons.conf
+  scp $local $remote && echo "  - copied $local to $remote"
+
+  local=install.sh
+  remote=pi@$name:/$remote_dir/install.sh
+  scp $local $remote && echo "  - copied $local to $remote"
+
 done

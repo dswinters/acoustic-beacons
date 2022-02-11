@@ -1,0 +1,14 @@
+[Unit]
+Description=Run acoustic beacons code with default configuration options
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/nav/code
+User=pi
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=acoustic_beacons
+ExecStart=/home/pi/nav/code/beacons.py
+
+[Install]
+WantedBy=multi-user.target
