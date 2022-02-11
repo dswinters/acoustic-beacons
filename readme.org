@@ -13,18 +13,29 @@ A mode can also be specified from the command line for testing purposes, ignorin
 ** Modes
 Depending on the specified mode, the node will perform a different task:
 
-- Active mode (~./beacons.py active~) runs two threads: one maintains a list of distances from all passive nodes in the network by cyclically pinging all passive nodes, and one parses all incoming messages.
+*** Operational modes
+
+- Set address (~./beacons.py set xxx~): sets the address of the attached modem to ~xxx~, then exits.
+
+- Active mode (~./beacons.py active~) runs two threads:
+  1) Cyclically send range pings to all passive beacons
+  2) Parse incoming range returns and broadcasts from passive beacons
+
+- Passive mode (~./beacons.py passive~) runs two threads:
+  1) Monitor GPS serial port for position updates
+  2) Periodically broadcast current position
+
+*** Testing/debug modes
 
 - Timer mode (~./beacons.py timer P~ or ~./beacons.py timer P xxx~) periodically (with period ~P~) broadcasts (or unicasts to modem ~xxx~) the current time from the node's Raspberry Pi.
 
-- Report mode (~./beacons.py report~) parses all incoming messages.
+- Report mode (~./beacons.py report~) prints all incoming messages.
 
-- Set address (~./beacons.py set xxx~): sets the address of the attached modem to ~xxx~.
 
 ** Deploying
 
 If all Raspberry Pi's have an entry in ~$HOME/.ssh/config~, ~deploy.sh~ can be used to copy code and configuration using ~scp~.
 
 * TODO In-progress
-- Create a "passive" mode which periodically broadcasts position
-- Estimate location every time an active beacon recieves a position from a passive beacon
+- Implement position estimator
+- Implement a local coordinate mode

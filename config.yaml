@@ -9,10 +9,8 @@ settings:
 
 modems:
   101:
-    host: navbeacon01
     mode: active
   202:
-    host: navbeacon02
     mode: passive
     lat: 27.988109
     lon: 86.924972
