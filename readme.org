@@ -4,11 +4,9 @@
 
 The Modem class in ~classes/modem.py~ provides an interface to Delphis subsea acoustic modems.
 
-Multiple nodes form an acoustic telemetry network. Each *node* is a Raspberry Pi with an attached acoustic modem.
+Multiple nodes form an acoustic telemetry network. Each *node* is a Raspberry Pi with an attached acoustic modem. Nodes are either *active* or *passive*. Passive nodes have known positions, either prescribed or measured with GPS, which are periodically broadcast. Active nodes send ranging pings to passive nodes and estimate their own positions using true-range multilateration.
 
-All nodes contain identical code. When a node starts up, it checks the address of the attached modem and runs using associated parameters from ~config.yaml~.
-
-A mode can also be specified from the command line for testing purposes, ignoring the mode in ~config.yaml~.
+All nodes contain identical code. When a node starts up, it checks the address of the attached modem and runs using associated parameters from ~config.yaml~. A mode can also be specified from the command line for testing purposes, ignoring the mode in ~config.yaml~.
 
 ** Modes
 Depending on the specified mode, the node will perform a different task:
@@ -34,8 +32,8 @@ Depending on the specified mode, the node will perform a different task:
 
 ** Deploying
 
-If all Raspberry Pi's have an entry in ~$HOME/.ssh/config~, ~deploy.sh~ can be used to copy code and configuration using ~scp~.
+Modify ~deploy.sh~ to copy necessary code to all nodes.
 
 * TODO In-progress
 - Implement position estimator
-- Implement a local coordinate mode
+- Create RPi setup script
