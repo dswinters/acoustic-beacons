@@ -27,8 +27,9 @@ class Mlat:
             local_ref = Proj(proj="aeqd", lat_0=lat0, lon_0=lon0, datum="WGS84", units="m")
 
         # Define coordinate transformations
-        gps2local = Transformer.from_proj(gps_ref, local_ref).transform
-        local2gps = Transformer.from_proj(local_ref, gps_ref).transform
+        self.gps2local = Transformer.from_proj(gps_ref, local_ref).transform
+        self.local2gps = Transformer.from_proj(local_ref, gps_ref).transform
 
     def solve(self,locs,dists):
         "Estimate a position given a list of passive beacon locations and distances"
+        # Math goes here
