@@ -177,11 +177,14 @@ class Modem:
             if msg:
                 if msg['type'] == 'broadcast':
                     if is_hex(msg['str']):
+                        # Decode the lat/lon message
                         lat,lon = decode_ll(msg['str'])
+                        # Update the location entry for the source beacon
                         self.locs[msg['src']]['lat'] = lat
                         self.locs[msg['src']]['lon'] = lon
                         print("%d is at %.5fN,%.5fE" % (msg['src'],lat,lon),flush=True)
                 elif msg['type'] == 'range':
+                    # Update the distance entry for the source beacon
                     self.dists[msg['src']] = msg['range']
                     print("%.2f m from %d" % (msg['range'], msg['src']),flush=True)
 
