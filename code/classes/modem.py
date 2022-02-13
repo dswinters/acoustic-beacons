@@ -129,7 +129,7 @@ class Modem:
     def set_address(self, address):
         "Set node address"
         cmd = "$A%03d" % (address)
-        return self.send(cmd, wait=True)
+        return self.send(cmd=cmd, wait=True, prefix="A")
 
     def broadcast(self, message, wait=False):
         "Send message to all units in range"
@@ -177,7 +177,7 @@ class Modem:
                 if msg['type'] == 'broadcast':
                     if is_hex(msg['str']):
                         lat,lon = decode_ll(msg['str'])
-                        print("%d is at %.5f,%.5f" % (msg['src'],lat,lon),flush=True)
+                        print("%d is at %.5fN,%.5fE" % (msg['src'],lat,lon),flush=True)
                 elif msg['type'] == 'range':
                     print("%.2f m from %d" % (msg['range'], msg['src']),flush=True)
 
