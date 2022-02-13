@@ -1,5 +1,5 @@
 settings:
-  coords: latlon
+  coords: local
   sound_speed: 1500
   repeat_rate: 0.2
   range_rate: 1.0
@@ -12,5 +12,5 @@ modems:
     mode: active
   202:
     mode: passive
-    lat: 27.988109
-    lon: 86.924972
+    x: 10
+    y: -10
