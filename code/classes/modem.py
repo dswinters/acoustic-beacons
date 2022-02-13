@@ -77,10 +77,11 @@ class Modem:
                 config['modems'][m]['lat'] = lat
                 config['modems'][m]['lon'] = lon
 
-        # Initialize dictionary for location of passive modems
+        # Initialize dictionaries for locations & distances of passive beacons
         self.locs = {m:{'lat': config['modems'][m]['lat'],
                         'lon': config['modems'][m]['lon']}
                      for m in self.passive_modems}
+        self.dists = {m:None for m in self.passive_modems}
 
         # Get initial position from config file
         self.lat = None
@@ -172,17 +173,20 @@ class Modem:
             msg_str = self.ser.readline().decode().strip()
             msg = parse_message(msg_str)
 
-            # Position message from passive beacon:
+            # Update position or distance from passive beacon
             if msg:
                 if msg['type'] == 'broadcast':
                     if is_hex(msg['str']):
                         lat,lon = decode_ll(msg['str'])
+                        self.locs[msg['src']]['lat'] = lat
+                        self.locs[msg['src']]['lon'] = lon
                         print("%d is at %.5fN,%.5fE" % (msg['src'],lat,lon),flush=True)
                 elif msg['type'] == 'range':
+                    self.dists[msg['src']] = msg['range']
                     print("%.2f m from %d" % (msg['range'], msg['src']),flush=True)
 
-                # Update position
-                self.mlat.solve(None,None)
+                # Pass positions & distances to multilateration solver
+                self.mlat.solve(self.locs,self.dists)
 
     def passive_gps(self):
         "Parse all incoming GPS messages and update position"
