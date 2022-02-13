@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
 import numpy as np
-from scipy import optimize
+from scipy.optimize import minimize
 from pyproj import Proj
 from pyproj import Transformer
 
+# Coordinate reference for GPS input (WGS84)
+gps_ref = Proj("epsg:4326")
+
 class Mlat:
     "True-range multilateration solver"
-
-    # Coordinate reference for GPS input (WGS84)
-    gps_ref = Proj("epsg:4326")
 
     def __init__(self, config):
         # If we're in a local coordinate system, i.e. passive beacon locations
@@ -30,6 +30,39 @@ class Mlat:
         self.gps2local = Transformer.from_proj(gps_ref, local_ref).transform
         self.local2gps = Transformer.from_proj(local_ref, gps_ref).transform
 
-    def solve(self,locs,dists):
+    def solve(self,locs,dists,x0=None):
         "Estimate a position given a list of passive beacon locations and distances"
-        # Math goes here
+
+        # Convert the lat, lons of all passive beacons to a matrix
+        # [x1, y1, z1;
+        #  x2, y2, z2;
+        #    ...     ]
+        P = np.array([gps2local(locs[m]['lat'],locs[m]['lon']) + (0,) for m in locs.keys()])
+
+        # Convert distances to a matrix
+        D = np.array([dists[m] for m in dists.keys()])
+
+        # Initial guess: average of passive beacon locations if none given.
+        if not x0:
+            x0 = np.mean(P, axis=0)
+            x0[2] = -10
+
+        # Position constraints: none in x,y, z must be negative (below sea-level)
+        bounds = [(None,None), (None,None), (-100, 0)]
+        x = minimize(rms_dists, x0, args=(P,D), method='TNC',
+                     bounds=bounds, jac=1e-1, options={'ftol':1e-4})
+
+        # Convert estimate to lat,lon
+        lat,lon = self.local2gps(x[0],x[1])
+
+        # Return coordinates lat,lon,z
+        return lat,lon,x[2]
+
+
+def obj_fun(x,P,D):
+    # The estimated position is the point x which minimizes the difference between:
+    # - Measured distance from all passive beacons
+    # - Computed distance between x and all passive beacons
+    # Compute the RMS of this difference over all beacons
+    dists = np.linalg.norm(P-x, axis=1)
+    return np.sqrt(np.mean(np.square(dists-D)))
