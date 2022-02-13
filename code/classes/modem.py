@@ -7,7 +7,7 @@ import time
 import yaml
 import numpy as np
 from datetime import datetime
-import base64
+from classes.mlat_solver import Mlat
 
 # Parse config file
 config_file = "/home/pi/nav/config.yaml"
@@ -66,6 +66,16 @@ class Modem:
                               if config['modems'][m]['mode']=='active']
         self.passive_modems = [int(m) for m in config['modems'].keys() \
                                if config['modems'][m]['mode']=='passive']
+
+        # Initialize multilateration solver
+        self.mlat = Mlat(config)
+        if config['settings']['coords'] == 'local':
+            for m in self.passive_modems:
+                x = config['modems'][m]['x']
+                y = config['modems'][m]['y']
+                lat,lon = self.mlat.local2gps(x,y)
+                config['modems'][m]['lat'] = lat
+                config['modems'][m]['lon'] = lon
 
         # Initialize dictionary for location of passive modems
         self.locs = {m:{'lat': config['modems'][m]['lat'],
@@ -163,14 +173,16 @@ class Modem:
             msg = parse_message(msg_str)
 
             # Position message from passive beacon:
-            if msg and msg['type'] == 'broadcast':
-                if is_hex(msg['str']):
-                    lat,lon = decode_ll(msg['str'])
-                    print("%d is at %.5f,%.5f" % (msg['src'],lat,lon),flush=True)
+            if msg:
+                if msg['type'] == 'broadcast':
+                    if is_hex(msg['str']):
+                        lat,lon = decode_ll(msg['str'])
+                        print("%d is at %.5f,%.5f" % (msg['src'],lat,lon),flush=True)
+                elif msg['type'] == 'range':
+                    print("%.2f m from %d" % (msg['range'], msg['src']),flush=True)
 
-            # Range return from passive beacon:
-            elif msg and msg['type'] == 'range':
-                print("%.2f m from %d" % (msg['range'], msg['src']),flush=True)
+                # Update position
+                self.mlat.solve(None,None)
 
     def passive_gps(self):
         "Parse all incoming GPS messages and update position"
@@ -304,6 +316,7 @@ def encode_decimal_deg(deg):
     #                           Degrees | Seconds  |
     #                                 Minutes    1 if negative
     neg = deg < 0
+    deg = abs(deg)
     mins = (deg-np.floor(deg))*60
     secs = (mins-np.floor(mins))*int('fff',16)
     return "%02x%02x%03x%1x" % (int(np.floor(deg)), int(np.floor(mins)), int(np.floor(secs)), neg)
