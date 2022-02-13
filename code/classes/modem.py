@@ -61,16 +61,14 @@ class Modem:
         print("Starting in %s mode" % self.mode)
         self.args = args
 
-        # Define active and passive modems
-        self.active_modems = [int(m) for m in config['modems'].keys() \
-                              if config['modems'][m]['mode']=='active']
-        self.passive_modems = [int(m) for m in config['modems'].keys() \
+        # Define passive beacons
+        self.passive_beacons = [int(m) for m in config['modems'].keys() \
                                if config['modems'][m]['mode']=='passive']
 
         # Initialize multilateration solver
         self.mlat = Mlat(config)
         if config['settings']['coords'] == 'local':
-            for m in self.passive_modems:
+            for m in self.passive_beacons:
                 x = config['modems'][m]['x']
                 y = config['modems'][m]['y']
                 lat,lon = self.mlat.local2gps(x,y)
@@ -80,8 +78,8 @@ class Modem:
         # Initialize dictionaries for locations & distances of passive beacons
         self.locs = {m:{'lat': config['modems'][m]['lat'],
                         'lon': config['modems'][m]['lon']}
-                     for m in self.passive_modems}
-        self.dists = {m:None for m in self.passive_modems}
+                     for m in self.passive_beacons}
+        self.dists = {m:None for m in self.passive_beacons}
 
         # Get initial position from config file
         self.lat = None
@@ -161,7 +159,7 @@ class Modem:
         "Cyclically loop over passive beacons and send ranging pings"
         # Writes to acoustic modem serial port
         t0 = time.time() - settings['range_rate']
-        for target in itertools.cycle(self.passive_modems):
+        for target in itertools.cycle(self.passive_beacons):
             while time.time() - t0 <= settings['range_rate']:
                 time.sleep(0.005)
             self.ping(target,wait=False)
@@ -189,7 +187,8 @@ class Modem:
                     print("%.2f m from %d" % (msg['range'], msg['src']),flush=True)
 
                 # Pass positions & distances to multilateration solver
-                self.mlat.solve(self.locs,self.dists)
+                if len(self.passive_beacons) > 2:
+                    self.mlat.solve(self.locs,self.dists)
 
     def passive_gps(self):
         "Parse all incoming GPS messages and update position"
