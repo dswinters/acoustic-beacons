@@ -32,7 +32,7 @@ Depending on the specified mode, the node will perform a different task:
 
 ** Deploying
 
-Modify ~deploy.sh~ to copy necessary code to all nodes.
+Copy ~deploy_example.sh~ to ~deploy.sh~ and modify as necessary to copy code to all nodes.
 
 * TODO In-progress
 - Implement position estimator
