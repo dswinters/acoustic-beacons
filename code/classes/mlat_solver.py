@@ -49,7 +49,9 @@ class Mlat:
 
         # Position constraints: none in x,y, z must be negative (below sea-level)
         bounds = [(None,None), (None,None), (-100, 0)]
-        x = minimize(rms_dists, x0, args=(P,D), method='TNC',
+
+        # Estimate position by numerically minimizing the objective function
+        x = minimize(obj_fun, x0, args=(P,D), method='TNC',
                      bounds=bounds, jac=1e-1, options={'ftol':1e-4})
 
         # Convert estimate to lat,lon
