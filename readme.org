@@ -35,5 +35,5 @@ Depending on the specified mode, the node will perform a different task:
 Copy ~deploy_example.sh~ to ~deploy.sh~ and modify as necessary to copy code to all nodes.
 
 * TODO In-progress
-- Implement position estimator
-- Create RPi setup script
+- Re-configure timing to switch between a broadcast phase and cyclic ping phase
+- Add third beacon class (non-tracking, non-broadcasting) for ranging only
