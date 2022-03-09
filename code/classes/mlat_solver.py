@@ -37,7 +37,7 @@ class Mlat:
         # [x1, y1, z1;
         #  x2, y2, z2;
         #    ...     ]
-        P = np.array([gps2local(locs[m]['lat'],locs[m]['lon']) + (0,) for m in locs.keys()])
+        P = np.array([gps2local(locs[m]['lat'],locs[m]['lon']) + (locs[m]['z'],) for m in locs.keys()])
 
         # Convert distances to a matrix
         D = np.array([dists[m] for m in dists.keys()])
@@ -45,7 +45,6 @@ class Mlat:
         # Initial guess: average of passive beacon locations if none given.
         if not x0:
             x0 = np.mean(P, axis=0)
-            x0[2] = -10
 
         # Position constraints: none in x,y, z must be negative (below sea-level)
         bounds = [(None,None), (None,None), (-100, 0)]

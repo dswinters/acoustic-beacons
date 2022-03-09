@@ -85,6 +85,9 @@ class Modem:
 
         # Initialize multilateration solver
         self.mlat = Mlat(config)
+
+        # If stations were configured with local coordinates, convert them to a
+        # local lat,lon coordinate system
         if config['settings']['coords'] == 'local':
             for m in self.passive_beacons:
                 x = config['modems'][m]['x']
@@ -93,18 +96,21 @@ class Modem:
                 config['modems'][m]['lat'] = lat
                 config['modems'][m]['lon'] = lon
 
-        # Initialize dictionaries for locations & distances of passive beacons
+        # Initialize dictionaries for passive beacon locations & distances
         self.locs = {m:{'lat': config['modems'][m]['lat'],
-                        'lon': config['modems'][m]['lon']}
+                        'lon': config['modems'][m]['lon'],
+                        'z':   config['modems'][m]['z']}
                      for m in self.passive_beacons}
         self.dists = {m:None for m in self.passive_beacons}
 
         # Get initial position from config file
         self.lat = None
         self.lon = None
+        self.z = None
         if self.mode == "passive":
             self.lat = config['modems'][self.address]['lat']
             self.lon = config['modems'][self.address]['lon']
+            self.z   = config['modems'][self.address]['z']
 
     #======================================================
     # Low-level modem commands
@@ -206,8 +212,19 @@ class Modem:
 
                 # Pass positions & distances to multilateration solver
                 if len(self.passive_beacons) > 2:
-                    [lat, lon, z] = self.mlat.solve(self.locs,self.dists)
-                    if
+
+                    # Use previous position as initial guess if possible
+                    if not (self.lat and self.lon and self.z):
+                        x0 = None
+                    else:
+                        x0 = np.array((self.lat, self.lon, self.z))
+
+                    # Estimate position
+                    [lat, lon, z] = self.mlat.solve(self.locs,self.dists,x0=x0)
+
+                    # TODO: overwrite z with pressure
+                    # if self.has_pressure:
+                    #     self.z = scale*self.pressure
                     # TODO: Do something with this, like sending to the ROV brain
 
     def passive_gps(self):
@@ -234,6 +251,11 @@ class Modem:
                 # self.lat = ...
                 # self.lon = ...
 
+    def monitor_pressure(self):
+        "TODO: Parse all incoming pressure messages and update depth"
+        # while self.ser_pressure.is_open:
+            # Parse messages
+            # self.z = ...
 
     def passive_broadcast(self):
         "Periodically broadcast current position"
@@ -278,6 +300,7 @@ class Modem:
         listen_thread = Thread(target = self.active_listen)
         gps_thread = Thread(target = self.passive_gps)
         broadcast_thread = Thread(target = self.passive_broadcast)
+        pressure_thread = Thread(target = self.monitor_pressure)
 
         # Threads for debugging
         report_thread = Thread(target = self.debug_report)
@@ -286,10 +309,12 @@ class Modem:
         if mode == "active":
             ping_thread.start()
             listen_thread.start()
+            pressure_thread.start()
 
         elif mode == "passive":
             broadcast_thread.start()
             gps_thread.start()
+            pressure_thread.start()
 
         elif mode == "timer":
             timer_thread.start()
