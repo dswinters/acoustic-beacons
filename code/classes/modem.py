@@ -246,7 +246,7 @@ class Modem:
             #
             msg_str = self.ser_gps.readline().decode().strip()
             if msg_str:
-                print(msg_str,flush=True)
+                # print(msg_str,flush=True)
                 # TODO: parse GPS messages and assign lat and lon
                 # self.lat = ...
                 # self.lon = ...
