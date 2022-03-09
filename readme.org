@@ -34,6 +34,14 @@ Depending on the specified mode, the node will perform a different task:
 
 Copy ~deploy_example.sh~ to ~deploy.sh~ and modify as necessary to copy code to all nodes.
 
+** Multilateration
+
+Each time an active beacon receives a new unit of position information (i.e. a passive beacon location or range), the multilateration solver estimates the active beacon's position.
+
+This process utilizes Scipy's [[https://docs.scipy.org/doc/scipy/reference/optimize.minimize-tnc.html][minimize]] function to numerically minimize the difference between measured ranges and expected ranges given a position estimate. This is a high-level but highly configuratble numerical solver, and may require additional tuning for best results.
+
+See [[https://en.wikipedia.org/wiki/True-range_multilateration][true-range multilateration]] on Wikipedia for more information on this class of problem.
+
 * TODO In-progress
 - Re-configure timing to switch between a broadcast phase and cyclic ping phase
 - Add third beacon class (non-tracking, non-broadcasting) for ranging only
