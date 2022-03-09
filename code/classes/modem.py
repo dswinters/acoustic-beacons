@@ -33,23 +33,13 @@ class Modem:
 
         # Open serial connection to modem
         self.ser = serial.Serial(
-            port='/dev/ttyUSB0',
+            port='/dev/ttyBeacon',
             baudrate = 9600,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
             timeout=0.1
         )
-
-        # # TODO Open serial connection to GPS
-        # self.ser_gps = serial.Serial(
-        #     port='/dev/ttyAMA0',
-        #     baudrate = 9600,
-        #     bytesize=serial.EIGHTBITS,
-        #     parity=serial.PARITY_NONE,
-        #     stopbits=serial.STOPBITS_ONE,
-        #     timeout=0.1
-        # )
 
         # Verify modem status
         status_msg = self.status()
@@ -60,6 +50,34 @@ class Modem:
         self.mode = mode or config['modems'][self.address]['mode']
         print("Starting in %s mode" % self.mode)
         self.args = args
+
+        # Open GPS serial port if configured
+        self.has_gps = False
+        if 'serial_gps' in config['modems'][self.address]:
+            print("Opening GPS serial port")
+            self.ser_gps = serial.Serial(
+                port=config['modems'][self.address]['serial_gps'],
+                baudrate = 9600,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=0.1
+            )
+            self.has_gps = True
+
+        # TODO: Open pressure serial port if configured
+        self.has_pressure = False
+        if 'serial_pressure' in config['modems'][self.address]:
+            print("Opening pressure serial port")
+            # self.ser_ = serial.Serial(
+            #     port=config['modems'][self.address]['serial_pressure'],
+            #     baudrate = 9600,
+            #     bytesize=serial.EIGHTBITS,
+            #     parity=serial.PARITY_NONE,
+            #     stopbits=serial.STOPBITS_ONE,
+            #     timeout=0.1
+            # )
+            # self.has_pressure = True
 
         # Define passive beacons
         self.passive_beacons = [int(m) for m in config['modems'].keys() \
@@ -188,16 +206,34 @@ class Modem:
 
                 # Pass positions & distances to multilateration solver
                 if len(self.passive_beacons) > 2:
-                    self.mlat.solve(self.locs,self.dists)
+                    [lat, lon, z] = self.mlat.solve(self.locs,self.dists)
+                    if
+                    # TODO: Do something with this, like sending to the ROV brain
 
     def passive_gps(self):
         "Parse all incoming GPS messages and update position"
         # Reads from GPS serial port
         while self.ser_gps.is_open:
+
+            # FIXME: This line sometimes fails with the following error, might
+            # need to change something here:
+            #
+            #     Traceback (most recent call last):
+            #       File "/usr/lib/python3.9/threading.py", line 954, in _bootstrap_inner
+            #         self.run()
+            #       File "/usr/lib/python3.9/threading.py", line 892, in run
+            #         self._target(*self._args, **self._kwargs)
+            #       File "/home/pi/nav/code/classes/modem.py", line 200, in passive_gps
+            #         msg_str = self.ser_gps.readline().decode().strip()
+            #     UnicodeDecodeError: 'utf-8' codec can't decode byte 0xfc in position 0: invalid start byte
+            #
             msg_str = self.ser_gps.readline().decode().strip()
-            # TODO: parse GPS messages and assign lat and lon
-            # self.lat = ...
-            # self.lon = ...
+            if msg_str:
+                print(msg_str,flush=True)
+                # TODO: parse GPS messages and assign lat and lon
+                # self.lat = ...
+                # self.lon = ...
+
 
     def passive_broadcast(self):
         "Periodically broadcast current position"
@@ -253,6 +289,7 @@ class Modem:
 
         elif mode == "passive":
             broadcast_thread.start()
+            gps_thread.start()
 
         elif mode == "timer":
             timer_thread.start()
