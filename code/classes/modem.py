@@ -69,7 +69,7 @@ class Modem:
         self.has_pressure = False
         if 'serial_pressure' in config['modems'][self.address]:
             print("Opening pressure serial port")
-            # self.ser_ = serial.Serial(
+            # self.ser_pressure = serial.Serial(
             #     port=config['modems'][self.address]['serial_pressure'],
             #     baudrate = 9600,
             #     bytesize=serial.EIGHTBITS,

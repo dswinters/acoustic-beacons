@@ -14,3 +14,6 @@ modems:
     mode: passive
     x: 10
     y: -10
+    z: 0
+    serial_gps: /dev/ttyAMA0
+    serial_pressure: /dev/ttyPressure
