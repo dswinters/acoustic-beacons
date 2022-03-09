@@ -1,6 +1,5 @@
 code
+system
 config.yaml
-beacons.service
-beacons.conf
 install.sh
 requirements.txt
