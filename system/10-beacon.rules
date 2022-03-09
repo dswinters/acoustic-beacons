@@ -8,4 +8,4 @@
 SUBSYSTEMS=="usb", ATTRS{product}=="USB-RS232 Cable", ATTRS{manufacturer}=="FTDI", MODE="0666", PROGRAM="/bin/bash -c '/bin/echo %p | /bin/grep -c :1.0'", RESULT=="1", SYMLINK+="ttyBeacon"
 
 # beacon (via RS232-USB adapter)
-SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idProduct}=="0121", ATTRS{idVendor}=="06cd", SYMLINK+="ttyBeacon"
+SUBSYSTEMS=="usb", ATTRS{idProduct}=="0121", ATTRS{idVendor}=="06cd", SYMLINK+="ttyBeacon"
