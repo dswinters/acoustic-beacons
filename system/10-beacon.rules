@@ -1,0 +1,11 @@
+# rules to mount specific usb devices by attribute to specific paths for reference by scripts
+#
+# a copy of this file must be placed in /etc/udev/rules.d to function
+#
+# acoustic beacon
+#
+# beacon (via RS232-TTL board)
+SUBSYSTEMS=="usb", ATTRS{product}=="USB-RS232 Cable", ATTRS{manufacturer}=="FTDI", MODE="0666", PROGRAM="/bin/bash -c '/bin/echo %p | /bin/grep -c :1.0'", RESULT=="1", SYMLINK+="ttyBeacon"
+
+# beacon (via RS232-USB adapter)
+SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idProduct}=="0121", ATTRS{idVendor}=="06cd", SYMLINK+="ttyBeacon"
